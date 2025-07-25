@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using SKC.Managers;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,7 +19,7 @@ namespace SKC.Cards
 
         // Privates
         private CardData cardData;
-        //private GameManager gameManager;
+        private CardManager cardManager;
         private bool isFlipped = false;
         private bool isMatched = false;
 
@@ -27,8 +28,9 @@ namespace SKC.Cards
             cardButton.onClick.AddListener(() => OnCardClicked());
         }
         
-        public void Initialize(CardData data)
+        public void Initialize(CardData data, CardManager cardManager)
         {
+            this.cardManager = cardManager;
             cardData = data;
             cardVisualContainer.gameObject.SetActive(true);
             cardBackground.sprite = cardFrontSprite;
@@ -42,9 +44,9 @@ namespace SKC.Cards
 
         void OnCardClicked()
         {
-            if (!isFlipped && !isMatched && !GameManager.Instance.IsChecking())
+            if (!isFlipped && !isMatched && !cardManager.IsChecking())
             {
-                GameManager.Instance.CardClicked(this);
+                cardManager.CardClicked(this);
             }
         }
 
@@ -52,10 +54,22 @@ namespace SKC.Cards
         {
             if (!isFlipped)
             {
-                cardImage.gameObject.SetActive(true);
-                cardBackground.sprite = cardBackgroundSprite;
-                isFlipped = true;
-                cardButton.interactable = false;
+                transform.DOKill(this.gameObject);
+                transform.DORotate(new Vector3(0, 90, 0), .1f)
+                    .SetEase(Ease.Linear)
+                    .OnComplete(() =>
+                    {
+                        cardImage.gameObject.SetActive(true);
+                        cardBackground.sprite = cardBackgroundSprite;
+                        
+                        transform.DORotate(new Vector3(0, 180, 0), .1f)
+                            .SetEase(Ease.Linear)
+                            .OnComplete(() =>
+                            {
+                                isFlipped = true;
+                                cardButton.interactable = false;
+                            });
+                    });
             }
         }
 
@@ -67,13 +81,28 @@ namespace SKC.Cards
         IEnumerator UnflipRoutine()
         {
             yield return new WaitForSeconds(0.2f);
-            cardImage.gameObject.SetActive(false);
-            cardBackground.sprite = cardFrontSprite;
-            isFlipped = false;
-            if (!isMatched)
-            {
-                cardButton.interactable = true;
-            }
+            
+            transform.DORotate(new Vector3(0, 90, 0), .10f)
+                .SetEase(Ease.Linear)
+                .SetDelay(0.8f)
+                .OnComplete(() =>
+                {
+                    cardImage.gameObject.SetActive(false);
+                    cardBackground.sprite = cardFrontSprite;
+                    
+                    transform.DORotate(new Vector3(0, 0, 0), .10f) 
+                        .SetEase(Ease.Linear)
+                        .OnComplete(() =>
+                        {
+                            isFlipped = false;
+                            if (!isMatched)
+                            {
+                                cardButton.interactable = true;
+                            }
+
+                            transform.localEulerAngles = Vector3.zero;
+                        });
+                });
         }
 
         public void SetMatched()

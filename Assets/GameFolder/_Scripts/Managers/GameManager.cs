@@ -1,34 +1,19 @@
-using UnityEngine;
-using UnityEngine.UI;
-using System.Collections.Generic;
-using System.Collections;
 using System;
-using SKC.Helper; 
-using SKC.Cards;
+using UnityEngine;
+using SKC.Events;
 
 namespace SKC.Managers
 {
     public class GameManager : MonoBehaviour
     {
-        [Header("Assigns")]
-        [SerializeField] private Card cardPrefab; 
-        [SerializeField] private RectTransform cardGridParentRect;
-        [SerializeField] private GridLayoutGroup gridLayoutGroup;
-        [SerializeField] private List<CardData> allCardDataList;
-
-        // Privates
-        private List<Card> allCards = new List<Card>();
-        private List<Card> flippedCards = new List<Card>();
-        private int matchesFound = 0;
-        private int totalPairs;
-
-        private bool isChecking = false;
+        [Header("References")]
+        [SerializeField] private CardManager cardManager;
+        [SerializeField] private LevelManager levelManager;
+        [SerializeField] private UIManager uiManager;
         
-        private int movesCount = 0;
-        private int comboCount = 0;
-        public int totalGameCards = 12;
-        public float cardSpacing = 10f;
-        public float targetCardAspectRatio = 9f / 16f; 
+        //Privates
+        private float _currentScore;
+        private float _addedScore;
         
         // Singleton Instance
         public static GameManager Instance { get; private set; }
@@ -44,168 +29,71 @@ namespace SKC.Managers
                 Destroy(gameObject); 
             }
         }
-
-        void Start()
+        
+        private void OnEnable()
         {
-            InitializeGameLayout(totalGameCards); 
+            EventBroker.onGameStart += InitializeGame;
+            EventBroker.onGameEnd += GameEnd;
+            EventBroker.onGameSave += SaveGame;
+            EventBroker.onGameRestart += GameRestart;
+            
+            EventBroker.onMatch += GetScore;
         }
 
-        public void InitializeGameLayout(int totalCardsCount)
+        private void OnDisable()
         {
-            ClearCards();
-            
-            Tuple<int, int> gridDimensions = GridHelper.CalculateOptimalGrid(totalCardsCount, cardGridParentRect, targetCardAspectRatio);
-            int calculatedRows = gridDimensions.Item1;
-            int calculatedColumns = gridDimensions.Item2;
-            
-            GridHelper.SetGridLayout(calculatedRows, calculatedColumns, cardSpacing, gridLayoutGroup, cardGridParentRect, targetCardAspectRatio);
+            EventBroker.onGameStart -= InitializeGame;
+            EventBroker.onGameEnd -= GameEnd;
+            EventBroker.onGameSave -= SaveGame;
+            EventBroker.onGameRestart -= GameRestart;
 
-            totalPairs = totalCardsCount / 2; 
-
-            GenerateCards();
-            //UpdateMovesText();
+            EventBroker.onMatch -= GetScore;
         }
 
-        void ClearCards()
+        public void InitializeGame()
         {
-            foreach (Transform child in gridLayoutGroup.transform)
-            {
-                PoolManager.Instance.ReturnObject(child.gameObject);
-            }
-            allCards.Clear();
-            flippedCards.Clear();
-            matchesFound = 0;
-            movesCount = 0;
-            //UpdateMovesText();
+            _currentScore = 0;
+            _addedScore = 0;
+            uiManager.SetBackgroundColor(levelManager.GetCurrentLevel().backgroundColor);
+            cardManager.InitializeGameLayout(levelManager.GetCurrentLevel());
         }
 
-        // void UpdateMovesText()
-        // {
-        //     if (movesText != null)
-        //     {
-        //         movesText.text = "Hamle: " + movesCount;
-        //     }
-        // }
-
-        void GenerateCards()
+        private void GameEnd()
         {
-            ShuffleList(allCardDataList);
-            List<CardData> gameCardData = new List<CardData>();
-            for (int i = 0; i < totalPairs; i++)
-            {
-                gameCardData.Add(allCardDataList[i]);
-                gameCardData.Add(allCardDataList[i]);
-            }
+            SaveManager.Instance.CheckHighScore(_currentScore);
+            SaveManager.Instance.CurrentGameData.level++;
+            SaveGame();
             
-            gameCardData = ShuffleList(gameCardData);
-
-            for (int i = 0; i < gameCardData.Count; i++)
-            {
-                GameObject newCardGO = PoolManager.Instance.GetObject(cardPrefab.name, gridLayoutGroup.transform);
-                Card newCard = newCardGO.GetComponent<Card>();
-                newCard.Initialize(gameCardData[i]);
-                allCards.Add(newCard);
-            }
-
-            StartCoroutine(RevealAllCard());
+            GameRestart();
         }
 
-        private IEnumerator RevealAllCard()
+        private void SaveGame()
         {
-            foreach (Card item in allCards)
-            {
-                item.FlipCard();
-            }
-            
-            yield return new WaitForSeconds(2.00f);
-            
-            foreach (Card item in allCards)
-            {
-                item.UnflipCard();
-            }
+            SaveManager.Instance.SaveGame();
         }
 
-        List<T> ShuffleList<T>(List<T> list)
+        private void GameRestart()
         {
-            System.Random rng = new System.Random();
-            int n = list.Count;
-            while (n > 1)
-            {
-                n--;
-                int k = rng.Next(n + 1);
-                T value = list[k];
-                list[k] = list[n];
-                list[n] = value;
-            }
-            return list;
+            _currentScore = 0;
+            _addedScore = 0;
+            cardManager.ResetGame();
         }
 
-        public void CardClicked(Card card)
+        public void GetScore(int combo)
         {
-            if (isChecking) return;
-
-            card.FlipCard();
-            flippedCards.Add(card);
+            if (combo >= 5) combo = 5;
             
-            SoundManager.Instance.Play("Flip");
-
-            if (flippedCards.Count == 2)
-            {
-                isChecking = true;
-                movesCount++;
-                //UpdateMovesText();
-                StartCoroutine(CheckForMatchRoutine());
-            }
+            _addedScore = combo * 5;
+            _currentScore += _addedScore;
+            
+            uiManager.UpdateScore(_currentScore,_addedScore,combo);
+            
         }
 
-        IEnumerator CheckForMatchRoutine()
+        [ContextMenu("Next Level")]
+        private void NextLevelTest()
         {
-            yield return new WaitForSeconds(0.50f);
-
-            Card card1 = flippedCards[0];
-            Card card2 = flippedCards[1];
-            
-            if (card1.GetCardID() == card2.GetCardID())
-            {
-                card1.SetMatched();
-                card2.SetMatched();
-                matchesFound++;
-                comboCount++;
-
-                if (matchesFound == totalPairs)
-                {
-                    // Oyun bitiş ekranı, yeni seviyeye geçiş vb.
-                    SoundManager.Instance.Play("Win");
-                }
-                else
-                {
-                    SoundManager.Instance.Play("Match");
-                }
-            }
-            else
-            {
-                card1.UnflipCard();
-                card2.UnflipCard();
-
-                comboCount = 0;
-                
-                SoundManager.Instance.Play("MissMatch");
-            }
-            
-            yield return new WaitForSeconds(0.20f);
-            
-            flippedCards.Clear();
-            isChecking = false;
-        }
-
-        public void ResetGame()
-        {
-            ClearCards();
-        }
-
-        public bool IsChecking()
-        {
-            return isChecking;
+            EventBroker.OnGameEnd();
         }
     }
 }

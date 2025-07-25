@@ -58,7 +58,7 @@ namespace SKC.Managers
             {
                 if (!audioSource.isPlaying)
                 {
-                    //audioSource.mute = GameManager.Instance.SaveData.Mute;
+                    audioSource.mute = !SaveManager.Instance.CurrentGameData.sfxEnabled;
                     audioSource.clip = clip[name];
                     audioSource.volume = volume[name];
                     audioSource.Play();

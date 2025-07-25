@@ -57,6 +57,17 @@ namespace SKC.Managers
 #endif
             }
         }
+
+        public void CheckHighScore(float score)
+        {
+            if (score >= CurrentGameData.highestPoint)
+            {
+                CurrentGameData.highestPoint = score;
+#if UNITY_EDITOR
+                Debug.Log($"Highest point updated: {CurrentGameData.highestPoint}");
+#endif
+            }
+        }
         
         public void ResetGameData()
         {

@@ -4,7 +4,10 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/GameFolder/Scenes/GamePlay_Portrait.unity
+    guid: 180ef7afca2a2004abe7e98a6ab0b12a
   m_configObjects:
     com.unity.adaptiveperformance.loader_settings: {fileID: 11400000, guid: 9b90d6600e3ea5c4ead9551da3e29052,
       type: 2}

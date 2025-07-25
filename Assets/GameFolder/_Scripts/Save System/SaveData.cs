@@ -7,7 +7,7 @@ namespace SKC.SaveSystem
     public class SaveData
     {
         public int level;
-        public int highestPoint;
+        public float highestPoint;
         public int totalMatchesFound;  
         public int totalMovesMade;     
         public float gameVolume;       
